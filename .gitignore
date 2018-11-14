@@ -1,0 +1,5 @@
+*.csr
+*.key
+*.crt
+*.db
+passwords.txt

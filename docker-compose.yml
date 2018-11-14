@@ -1,0 +1,9 @@
+version: '3'
+services:
+  mqtt:
+    image: eclipse-mosquitto
+    volumes:
+      - ./config:/mosquitto/config
+      - ./data:/mosquitto/data
+    ports:
+      - "8883:8883"
