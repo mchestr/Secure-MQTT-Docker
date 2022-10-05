@@ -1,5 +1,11 @@
-*.csr
-*.key
-*.crt
-*.db
-passwords.txt
+mounted-volumes
+mqtt/certs/broker/broker.crt
+mqtt/certs/broker/broker.csr
+mqtt/certs/broker/broker.key
+mqtt/certs/ca/ca.crt
+mqtt/certs/ca/ca.key
+mqtt/certs/ca/ca.srl
+mqtt/certs/clients/*.crt
+mqtt/certs/clients/*.csr
+mqtt/certs/clients/*.key
+nohup.out

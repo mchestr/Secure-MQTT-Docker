@@ -1,113 +1,63 @@
 # Basic Docker setup for a TLS enabled MQTT Server
 
-# Getting Started
+This project establishes an MQTT broker with TLS and user
+authentication.  Most actions including the generation of certificates
+are performed using GNU make to reduce errors introduced with manual
+procedures.  You can print help using the command `make help`.
 
-First you must generate the certificates used for TLS, if you already have certificates skip to the next section.
+## Setup
 
-# Generate Certificates
+All MQTT clients must not only have a valid certificate, but they also
+must use user authentication to successfully connect to the broker.
+In this project, only one client is defined in the Makefile.
 
-`cd ./config` before executing this section.
+For each new client, you must edit a file containing information
+required to build a client certificate as well as the client's
+username and password.
 
-## Create Root CA (Done once)
+Therefore, you must create a file named `*.client` in the
+`mqtt/certs/clients` directory, where `*` is the unique name of the
+client.
 
-### Create Root Key
+Your operating procedures will vary, but I found that it's useful to
+name the client file the same as the username.
 
-**Attention:** this is the key used to sign the certificate requests, anyone holding this can sign certificates on your behalf. So keep it in a safe place!
+The `*.client` file contains one line, with several fields separated
+by semicolons.  The first column contains the subject line of the
+client's certificate.  The second and third fields contain the
+username and password used in authentication with the MQTT broker.
+
+Example:
+
+```
+/C=SE/ST=Stockholm/L=Stockholm/O=snuffeldorf.com/OU=Client/CN=localhost;example_user;insecure
+```
+
+## Run
+
+It's safe to start and stop the broker without fear of losing the
+certificates. Start the MQTT broker with `make start`.
 
 ```bash
-openssl genrsa -des3 -out rootCA.key 4096
+make start
 ```
 
-If you want a non password protected key just remove the `-des3` option
-
-
-### Create and self sign the Root Certificate
+To stop, run:
 
 ```bash
-openssl req -x509 -new -nodes -key rootCA.key -sha256 -days 1024 -out rootCA.crt
+make stop
 ```
 
-Here we used our root key to create the root certificate that needs to be distributed in all the computers that have to trust us.
+## Test
 
-
-## Create a server certificate
-
-### Create the certificate key
-
+1. Start the MQTT broker using `make start`.
+2. Verify that the broker is running with `docker-compose ps`
+3. Subscribe to the /world topic:
+```bash
+mosquitto_sub -h localhost -p 8883 -u example_user -P 'insecure' --cafile mqtt/certs/ca/ca.crt --cert mqtt/certs/clients/example_user.crt --key mqtt/certs/clients/example_user.key -t /world
 ```
-openssl genrsa -out server.key 2048
+4. Manually publish a message:
+```bash
+mosquitto_pub -h localhost -p 8883 -u example_user -P 'insecure' --cafile mqtt/certs/ca/ca.crt --cert mqtt/certs/clients/example_user.crt --key mqtt/certs/clients/example_user.key -m hello -t /world
 ```
-
-### Create the signing  (csr)
-
-The certificate signing request is where you specify the details for the certificate you want to generate.
-This request will be processed by the owner of the Root key (you in this case since you create it earlier) to generate the certificate.
-
-**Important:** Please mind that while creating the signign request is important to specify the `Common Name` providing the IP address or domain name for the service, otherwise the certificate cannot be verified.
-
-If you generate the csr in this way, openssl will ask you questions about the certificate to generate like the organization details and the `Common Name` (CN) that is the web address you are creating the certificate for, e.g `mydomain.com`.
-
-```
-openssl req -new -key server.key -out server.csr
-```
-
-
-### Verify the csr's content
-
-```
-openssl req -in server.csr -noout -text
-```
-
-### Generate the certificate using the `server` csr and key along with the CA Root key
-
-```
-openssl x509 -req -in server.csr -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -out server.crt -days 500 -sha256
-```
-
-### Verify the certificate's content
-
-```
-openssl x509 -in server.crt -text -noout
-```
-
-## Create a client certificate
-
-### Create the certificate key
-
-```
-openssl genrsa -out client.key
-```
-
-### Create the signing  (csr)
-
-```
-openssl req -new -key client.key -out client.csr
-```
-
-### Verify the csr's content
-
-```
-openssl req -in client.csr -noout -text
-```
-
-### Generate the certificate using the `client` csr and key along with the CA Root key
-
-```
-openssl x509 -req -CA rootCA.crt -CAkey rootCA.key -CAcreateserial -in client.csr -out client.crt
-```
-
-### Verify the certificate's content
-
-```
-openssl x509 -in client.crt -text -noout
-```
-
-# Move Certificates and Verify Docker Compose Values
-
-Move the `rootCA.crt` and `server.*` into the `./config` directory and adjust the file names in `docker-compose.yml` accordingly.
-
-# Generate Passwords File
-
-`docker run -it --rm -v $pwd/config:/mosquitto/config eclipse-mosquitto mosquitto_passwd -c /mosquitto/config/passwords.txt <username>`
-
-to add more users change `-c` to `-b`
+5. Verify that the subscriber prints out the `hello` message to the `/world` topic.
